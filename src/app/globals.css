@@ -1,0 +1,316 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   BACAR.AZ — Global Stiller
+   ============================================ */
+
+/* === CSS Değişkenleri === */
+:root {
+  --brand-blue: #0066FF;
+  --brand-green: #00C853;
+  --brand-gold: #FFD700;
+  --brand-dark: #0A0A0A;
+  --bg-primary: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F1F5F9;
+  --border-color: #E2E8F0;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+  --shadow-color: rgba(0, 0, 0, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.3);
+}
+
+.dark {
+  --bg-primary: #0A0A0A;
+  --bg-card: #141414;
+  --bg-card-hover: #1A1A1A;
+  --border-color: #1E1E1E;
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --shadow-color: rgba(0, 102, 255, 0.08);
+  --glass-bg: rgba(20, 20, 20, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+/* === Base Stiller === */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* === Glassmorphism === */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px var(--shadow-color);
+}
+
+/* === Gradient Metinler === */
+.gradient-text-blue {
+  background: linear-gradient(135deg, #0066FF, #00A3FF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-green {
+  background: linear-gradient(135deg, #00C853, #00E676);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-gold {
+  background: linear-gradient(135deg, #FFD700, #FFA000);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-multi {
+  background: linear-gradient(135deg, #0066FF, #00C853, #FFD700);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* === Gradient Arka Planlar === */
+.gradient-bg-hero {
+  background: linear-gradient(135deg, #0A0A0A 0%, #0d1b2a 40%, #1b263b 70%, #0A0A0A 100%);
+}
+
+.dark .gradient-bg-hero {
+  background: linear-gradient(135deg, #0A0A0A 0%, #0d1b2a 40%, #1b263b 70%, #0A0A0A 100%);
+}
+
+.light .gradient-bg-hero,
+:root:not(.dark) .gradient-bg-hero {
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 40%, #BFDBFE 70%, #EFF6FF 100%);
+}
+
+/* === Hover Lift Efekti === */
+.hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px var(--shadow-color);
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.6s cubic-bezier(0.2, 0.65, 0.3, 1) both;
+}
+
+.float-label-wrap {
+  position: relative;
+}
+
+.float-label {
+  position: absolute;
+  left: 0.9rem;
+  top: 0.88rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: all 0.18s ease;
+  background: var(--bg-card);
+  padding: 0 0.3rem;
+}
+
+.float-label-wrap input:focus + .float-label,
+.float-label-wrap input:not(:placeholder-shown) + .float-label {
+  top: -0.55rem;
+  font-size: 0.75rem;
+  color: var(--brand-blue);
+}
+
+/* === Özel Scrollbar === */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* === Animasyonlar === */
+.animate-delay-100 { animation-delay: 100ms; }
+.animate-delay-200 { animation-delay: 200ms; }
+.animate-delay-300 { animation-delay: 300ms; }
+.animate-delay-400 { animation-delay: 400ms; }
+.animate-delay-500 { animation-delay: 500ms; }
+
+/* === Typewriter === */
+.typewriter-cursor::after {
+  content: '|';
+  animation: blink 1s step-end infinite;
+  color: var(--brand-blue);
+  font-weight: 300;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* === Input Focus Stili === */
+.input-focus {
+  transition: all 0.2s ease;
+}
+
+.input-focus:focus {
+  outline: none;
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.15);
+}
+
+/* === Badge Stiller === */
+.badge-blue { background: rgba(0, 102, 255, 0.1); color: #0066FF; }
+.badge-green { background: rgba(0, 200, 83, 0.1); color: #00C853; }
+.badge-gold { background: rgba(255, 215, 0, 0.15); color: #B8860B; }
+
+.dark .badge-gold { color: #FFD700; }
+
+/* === Aktif Link === */
+.nav-link-active {
+  color: var(--brand-blue);
+  position: relative;
+}
+
+.nav-link-active::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--brand-blue);
+  border-radius: 1px;
+}
+
+/* === Pulse Ring Animasyonu (Coming Soon kartlar için) === */
+.pulse-ring {
+  position: relative;
+}
+
+.pulse-ring::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #0066FF, #00C853, #FFD700);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.pulse-ring:hover::before {
+  opacity: 0.15;
+}
+
+/* === Seçim Rengi === */
+::selection {
+  background: rgba(0, 102, 255, 0.2);
+  color: var(--text-primary);
+}
+
+/* === Form Öğeleri (Dark mode uyumlu) === */
+input, textarea, select {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+/* === Star Rating === */
+.star-filled { color: #FFD700; }
+.star-empty { color: var(--border-color); }
+
+/* === Skeleton Shimmer === */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-map-az {
+    opacity: 0.05;
+  }
+}

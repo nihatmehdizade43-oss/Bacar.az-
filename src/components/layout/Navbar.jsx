@@ -12,7 +12,7 @@ import ThemeToggle from './ThemeToggle';
 import Button from '@/components/ui/Button';
 
 const navLinks = [
-  { href: '/', label: 'Ana Səhifə' },
+  { href: '/', label: 'Ana' },
   { href: '/bacar', label: 'BACAR' },
   { href: '/ortaq', label: 'ORTAQ' },
   { href: '/rehber', label: 'RƏHBƏR' },
@@ -72,7 +72,7 @@ export default function Navbar() {
             </>
           ) : (
             <Link href="/login">
-              <Button variant="primary" size="sm">Login</Button>
+              <Button variant="primary" size="sm">Daxil ol</Button>
             </Link>
           )}
         </div>

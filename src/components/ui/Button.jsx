@@ -9,6 +9,8 @@ const variants = {
   primary: 'bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25',
   success: 'bg-brand-green hover:bg-green-700 text-white shadow-lg shadow-green-500/25',
   gold: 'bg-brand-gold hover:bg-yellow-600 text-gray-900 shadow-lg shadow-yellow-500/25',
+  gradient:
+    'text-white shadow-lg shadow-emerald-500/20 bg-gradient-to-r from-[#0066FF] via-[#00A3FF] to-[#00C853] hover:brightness-110',
   outline: 'border-2 border-brand-blue text-brand-blue hover:bg-brand-blue hover:text-white',
   ghost: 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]',
   danger: 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/25',

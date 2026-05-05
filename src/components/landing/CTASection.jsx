@@ -29,8 +29,7 @@ export default function CTASection() {
               viewport={{ once: true }}
               className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-6"
             >
-              Özünü sınayın —<br />
-              <span className="text-brand-gold">Qeydiyyat pulsuzdur</span>
+              Özünü sına — Qeydiyyat pulsuzdur
             </motion.h2>
 
             <motion.p
@@ -51,14 +50,13 @@ export default function CTASection() {
               transition={{ delay: 0.4 }}
               className="flex flex-col sm:flex-row items-center justify-center gap-4"
             >
-              <Link href="/auth">
+              <Link href="/register">
                 <Button
-                  variant="gold"
+                  variant="gradient"
                   size="xl"
-                  icon="⚡"
-                  className="shadow-2xl shadow-yellow-500/30"
+                  className="shadow-2xl shadow-emerald-500/25"
                 >
-                  Pulsuz qeydiyyatdan keç
+                  Özünü sına
                 </Button>
               </Link>
               <Link href="/vizit">

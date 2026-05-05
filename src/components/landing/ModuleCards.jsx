@@ -74,9 +74,9 @@ export default function ModuleCards() {
 function ActiveModuleCard({ module }) {
   return (
     <div
-      className={`relative p-6 rounded-2xl border border-[var(--border-color)]
-        bg-[var(--bg-card)] cursor-pointer transition-all duration-300 hover:scale-[1.02]
-        hover:shadow-2xl ${borderColors[module.color]} ${glowShadows[module.color]}`}
+      className={`relative p-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur
+        cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl
+        ${borderColors[module.color]} ${glowShadows[module.color]}`}
     >
       {/* Aktif Badge */}
       <div className="absolute top-4 right-4">
@@ -123,9 +123,8 @@ function ActiveModuleCard({ module }) {
 function ComingSoonCard({ module }) {
   return (
     <div
-      className={`relative p-6 rounded-2xl border border-[var(--border-color)]
-        bg-[var(--bg-card)] opacity-70 hover:opacity-90 transition-all duration-300
-        ${borderColors[module.color]}`}
+      className={`relative p-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur
+        opacity-70 hover:opacity-90 transition-all duration-300 ${borderColors[module.color]}`}
     >
       {/* Tezliklə Badge */}
       <div className="absolute top-4 right-4">

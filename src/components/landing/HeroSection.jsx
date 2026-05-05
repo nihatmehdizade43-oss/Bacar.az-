@@ -9,7 +9,7 @@ import Button from '@/components/ui/Button';
 
 export default function HeroSection() {
   const { text, isComplete } = useTypewriter(
-    ['Bacar.', 'Tap.', 'Böyü.'],
+    ['Bacar. Tap. Böyü.'],
     120,
     80,
     800
@@ -41,19 +41,9 @@ export default function HeroSection() {
 
         {/* CTA Butonlar */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 fade-in-up animate-delay-300">
-          <Link href="/vizit">
-            <Button variant="success" size="lg" icon="🎯">
-              Portfolionu yarat — 2 dəqiqə
-            </Button>
-          </Link>
-          <Link href="/bacar">
-            <Button variant="primary" size="lg" icon="💼">
-              İş elanı ver
-            </Button>
-          </Link>
-          <Link href="/auth">
-            <Button variant="gold" size="lg" icon="⚡">
-              Qeydiyyat pulsuzdur
+          <Link href="/register">
+            <Button variant="gradient" size="xl">
+              Özünü sına
             </Button>
           </Link>
         </div>

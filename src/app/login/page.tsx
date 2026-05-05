@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const authError = params.get("error");
   const passwordScore =
     (password.length >= 8 ? 1 : 0) +
     (/[A-Z]/.test(password) ? 1 : 0) +
@@ -23,6 +24,12 @@ export default function LoginPage() {
     passwordScore <= 1 ? "Zəif" : passwordScore <= 2 ? "Orta" : "Güclü";
 
   const callbackUrl = params.get("callbackUrl") || "/dashboard";
+  const uiAuthError =
+    authError === "OAuthAccountNotLinked"
+      ? "Bu email başqa giriş üsulu ilə qeydiyyatdan keçib. Zəhmət olmasa əvvəlki üsulla daxil olun."
+      : authError
+        ? "Giriş xətası, yenidən cəhd edin."
+        : "";
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,6 +103,7 @@ export default function LoginPage() {
             </div>
             <p className="text-xs text-[var(--text-secondary)]">Şifrə gücü: {strengthLabel}</p>
           </div>
+          {uiAuthError ? <p className="text-sm text-red-500">{uiAuthError}</p> : null}
           {error ? <p className="text-sm text-red-500">{error}</p> : null}
           <button disabled={loading} className="w-full rounded-xl bg-brand-blue px-4 py-3 font-semibold text-white disabled:opacity-50">
             {loading ? "Yoxlanılır..." : "Daxil ol"}

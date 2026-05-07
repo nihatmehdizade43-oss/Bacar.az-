@@ -22,20 +22,11 @@ const navLinks = [
 
 const isActive = (pathname, href) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
 
-type Notification = {
-  id: string;
-  title: string;
-  body: string;
-  type: string;
-  readAt: string | null;
-  link: string | null;
-  createdAt: string;
-};
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
   const { data: session } = useSession();

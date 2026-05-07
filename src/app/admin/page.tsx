@@ -1,432 +1,436 @@
-// Purpose: Full admin dashboard — stats, flagged messages, user management, contracts.
-"use client";
+// Purpose: Full admin dashboard — stats, all users, listings, messages, VIP management.
+'use client';
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
+import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { motion } from 'framer-motion';
 
-type User = {
-  id: string; name: string; email: string; role: string;
-  city: string | null; bannedAt: string | null; warnCount: number; createdAt: string;
-};
-type Job = {
-  id: string; title: string; status: string; budget: number; createdAt: string;
-  author: { name: string; email: string }; _count: { applications: number };
-};
-type App = {
-  id: string; status: string; createdAt: string;
-  user: { name: string; email: string }; job: { title: string };
-};
-type FlaggedMsg = {
-  id: string; body: string; filteredBody: string | null; flagReason: string | null; createdAt: string;
-  sender: { id: string; name: string; email: string };
-};
-type AdminData = {
-  counts: {
-    totalUsers: number; totalJobs: number; totalApplications: number;
-    todayUsers: number; weekUsers: number; monthUsers: number;
-    activeJobs: number; pendingApps: number; flaggedMessages: number; bannedUsers: number;
-  };
-  recentUsers: User[];
-  recentJobs: Job[];
-  recentApps: App[];
-  flaggedMessages: FlaggedMsg[];
-};
+/* ─── Helpers ─── */
+function fmt(n) { return n?.toLocaleString('az-AZ') ?? '0'; }
+function timeAgo(d) {
+  const diff = (Date.now() - new Date(d)) / 1000;
+  if (diff < 60) return `${Math.floor(diff)}s əvvəl`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}d əvvəl`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}s əvvəl`;
+  return new Date(d).toLocaleDateString('az-AZ');
+}
 
-type Tab = "users" | "jobs" | "apps" | "flagged";
+/* ─── Stat Card ─── */
+function StatCard({ label, value, icon, color = '#0066FF', sub }) {
+  return (
+    <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs text-[var(--text-muted)]">{label}</p>
+          <p className="mt-1 text-3xl font-black" style={{ color }}>{fmt(value)}</p>
+          {sub && <p className="text-xs text-[var(--text-muted)] mt-0.5">{sub}</p>}
+        </div>
+        <span className="text-2xl">{icon}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Tab Button ─── */
+function Tab({ active, onClick, children, count }) {
+  return (
+    <button onClick={onClick}
+      className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+        active ? 'bg-brand-blue text-white shadow-lg' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
+      }`}>
+      {children}
+      {count !== undefined && (
+        <span className={`rounded-full px-1.5 py-0.5 text-xs ${active ? 'bg-white/20' : 'bg-[var(--border-color)]'}`}>
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [data, setData] = useState<AdminData | null>(null);
+
+  const [stats, setStats] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [flagged, setFlagged] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-  const [activeTab, setActiveTab] = useState<Tab>("users");
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [userSearch, setUserSearch] = useState('');
+  const [actionMsg, setActionMsg] = useState('');
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/stats");
-      const json = await res.json();
-      if (!res.ok) {
-        if (res.status === 403) { router.push("/admin/login"); return; }
-        setError(json?.error?.message ?? "Məlumatlar yüklənmədi.");
-        return;
-      }
-      setData(json.data);
-      setLastRefresh(new Date());
-      setError("");
-    } catch { setError("Server ilə əlaqə qurula bilmədi."); }
-    finally { setLoading(false); }
-  }, [router]);
-
+  /* Auth guard */
   useEffect(() => {
-    if (status === "loading") return;
-    if (!session?.user) { router.push("/admin/login"); return; }
-    fetchStats();
-    const interval = setInterval(fetchStats, 30000);
-    return () => clearInterval(interval);
-  }, [session, status, router, fetchStats]);
+    if (status === 'unauthenticated') router.push('/admin/login');
+    if (status === 'authenticated' && session?.user?.role !== 'admin') router.push('/');
+  }, [status, session, router]);
 
-  async function userAction(userId: string, action: string) {
-    setActionLoading(userId + action);
+  /* Fetch all data */
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
     try {
-      await fetch(`/api/admin/users/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      await fetchStats();
-    } catch {}
-    setActionLoading(null);
+      const [statsRes, usersRes, jobsRes, flagRes] = await Promise.all([
+        fetch('/api/admin/stats').then(r => r.json()),
+        fetch('/api/admin/users?limit=100').then(r => r.json()),
+        fetch('/api/admin/listings?limit=50').then(r => r.json()),
+        fetch('/api/admin/flagged').then(r => r.json()),
+      ]);
+      if (statsRes.data) setStats(statsRes.data);
+      if (usersRes.success) setUsers(usersRes.data);
+      if (jobsRes.success) setJobs(jobsRes.data);
+      if (flagRes.success) setFlagged(flagRes.data);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { if (status === 'authenticated') fetchAll(); }, [status, fetchAll]);
+
+  /* User action */
+  async function userAction(userId, action) {
+    setActionMsg('');
+    const res = await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, action }),
+    });
+    const json = await res.json();
+    if (json.success) {
+      setActionMsg(`✅ Əməliyyat tamamlandı`);
+      fetchAll();
+    }
   }
 
-  if (status === "loading" || loading) {
+  /* Job action */
+  async function jobAction(jobId, action) {
+    await fetch('/api/admin/listings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId, action }),
+    });
+    fetchAll();
+  }
+
+  /* Resolve flagged */
+  async function resolveFlag(msgId) {
+    await fetch(`/api/admin/flagged/${msgId}`, { method: 'PATCH' });
+    fetchAll();
+  }
+
+  const filteredUsers = users.filter(u =>
+    u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+    u.email?.toLowerCase().includes(userSearch.toLowerCase())
+  );
+
+  if (status === 'loading' || loading) {
     return (
-      <section className="min-h-[80vh] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-10 h-10 border-2 border-brand-blue border-t-transparent rounded-full mx-auto mb-4" />
-          <p className="text-[var(--text-secondary)]">Admin panel yüklənir...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 rounded-full border-4 border-brand-blue border-t-transparent animate-spin mx-auto" />
+          <p className="text-[var(--text-muted)]">Admin panel yüklənir...</p>
         </div>
-      </section>
+      </div>
     );
   }
 
-  if (error && !data) {
-    return (
-      <section className="min-h-[80vh] flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <div className="text-5xl mb-4">⚠️</div>
-          <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Xəta</h2>
-          <p className="text-[var(--text-secondary)] mb-4">{error}</p>
-          <button onClick={fetchStats} className="px-6 py-3 rounded-xl bg-brand-blue text-white font-semibold">
-            Yenidən cəhd et
-          </button>
-        </div>
-      </section>
-    );
-  }
-
-  if (!data) return null;
-  const { counts } = data;
-
-  const tabs: { key: Tab; label: string; count: number; alert?: boolean }[] = [
-    { key: "users", label: "👥 İstifadəçilər", count: counts.totalUsers },
-    { key: "jobs", label: "💼 İş Elanları", count: counts.totalJobs },
-    { key: "apps", label: "📝 Müraciətlər", count: counts.totalApplications },
-    { key: "flagged", label: "🚩 Şübhəli Mesajlar", count: counts.flaggedMessages, alert: counts.flaggedMessages > 0 },
-  ];
+  const c = stats?.counts || {};
 
   return (
-    <section className="min-h-[80vh] py-6 px-4">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-[var(--bg-primary)] pt-20 pb-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+
         {/* Header */}
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-black text-[var(--text-primary)] flex items-center gap-3">
-              <span className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-xl">🔐</span>
-              Admin Panel
+            <h1 className="text-3xl font-black text-[var(--text-primary)]">
+              🛡️ Admin Panel
             </h1>
-            <p className="text-[var(--text-secondary)] text-sm mt-1">
-              Xoş gəldin, {session?.user?.name} · Son yeniləmə: {lastRefresh.toLocaleTimeString("az-AZ")}
+            <p className="text-sm text-[var(--text-muted)] mt-1">
+              Bacar.az — Tam İdarəetmə Paneli
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={fetchStats} className="px-4 py-2 rounded-xl border border-[var(--border-color)] text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] transition-all flex items-center gap-2">
-              🔄 Yenilə
-            </button>
-            <Link href="/" className="px-4 py-2 rounded-xl border border-[var(--border-color)] text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] transition-all">
-              ← Sayta qayıt
-            </Link>
-          </div>
-        </header>
-
-        {/* Main Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          <StatCard icon="👥" label="İstifadəçi" value={counts.totalUsers} color="blue" />
-          <StatCard icon="💼" label="İş Elanları" value={counts.totalJobs} sub={`${counts.activeJobs} aktiv`} color="green" />
-          <StatCard icon="📝" label="Müraciət" value={counts.totalApplications} sub={`${counts.pendingApps} gözləyən`} color="purple" />
-          <StatCard icon="🚩" label="Şübhəli Mesaj" value={counts.flaggedMessages} color="red" />
-          <StatCard icon="⛔" label="Bloklu User" value={counts.bannedUsers} color="orange" />
-          <StatCard icon="📊" label="Ort. Müraciət" value={counts.totalJobs > 0 ? (counts.totalApplications / counts.totalJobs).toFixed(1) : "0"} color="gold" />
+          <button onClick={fetchAll}
+            className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-2 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+            🔄 Yenilə
+          </button>
         </div>
 
-        {/* Registration Tracker */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
-              📈 Qeydiyyat Statistikası
-              <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
-            </h2>
-            <span className="text-xs text-[var(--text-muted)]">Canlı · Hər 30 saniyədə yenilənir</span>
+        {actionMsg && (
+          <div className="mb-4 rounded-xl bg-green-500/10 border border-green-500/30 px-4 py-3 text-sm text-green-400">
+            {actionMsg}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <RegCard period="Bu gün" count={counts.todayUsers} icon="📅" gradient="from-blue-500/10 to-blue-600/5" border="border-blue-500/20" textColor="text-blue-500" />
-            <RegCard period="Bu həftə" count={counts.weekUsers} icon="📆" gradient="from-green-500/10 to-green-600/5" border="border-green-500/20" textColor="text-green-500" />
-            <RegCard period="Bu ay" count={counts.monthUsers} icon="🗓️" gradient="from-purple-500/10 to-purple-600/5" border="border-purple-500/20" textColor="text-purple-500" />
-          </div>
-        </motion.div>
+        )}
 
         {/* Tabs */}
-        <div className="flex bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-1 gap-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 min-w-max py-2.5 px-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-                activeTab === tab.key ? "bg-brand-blue text-white shadow-lg shadow-blue-500/20" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
-              }`}>
-              {tab.label}
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                tab.alert ? "bg-red-500 text-white animate-pulse" :
-                activeTab === tab.key ? "bg-white/20" : "bg-[var(--bg-primary)]"
-              }`}>{tab.count}</span>
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-2 mb-6 p-1 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)]">
+          <Tab active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>📊 Ümumi</Tab>
+          <Tab active={activeTab === 'users'} onClick={() => setActiveTab('users')} count={users.length}>👥 İstifadəçilər</Tab>
+          <Tab active={activeTab === 'listings'} onClick={() => setActiveTab('listings')} count={jobs.length}>📋 Elanlar</Tab>
+          <Tab active={activeTab === 'alovlu'} onClick={() => setActiveTab('alovlu')}>🔥 Alovlu</Tab>
+          <Tab active={activeTab === 'flagged'} onClick={() => setActiveTab('flagged')} count={flagged.length}>🚩 Şikayətlər</Tab>
         </div>
 
-        {/* Tab Content */}
-        <AnimatePresence mode="wait">
-          {/* Users Tab */}
-          {activeTab === "users" && (
-            <TabPanel key="users">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[var(--bg-primary)]">
-                    {["#", "Ad", "Email", "Rol", "Şəhər", "Xəbərdarlıq", "Status", "Qeydiyyat", "Əməliyyat"].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left font-semibold text-[var(--text-secondary)] whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border-color)]">
-                  {data.recentUsers.map((u, i) => (
-                    <tr key={u.id} className="hover:bg-[var(--bg-card-hover)] transition-colors">
-                      <td className="px-4 py-3 text-[var(--text-muted)]">{i + 1}</td>
-                      <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{u.name}</td>
-                      <td className="px-4 py-3 text-[var(--text-secondary)] text-xs">{u.email}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${u.role === "admin" ? "bg-red-500/10 text-red-500" : "bg-blue-500/10 text-blue-500"}`}>
-                          {u.role === "admin" ? "Admin" : "İstifadəçi"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-[var(--text-secondary)]">{u.city ?? "—"}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-semibold ${u.warnCount >= 2 ? "text-red-500" : u.warnCount === 1 ? "text-yellow-500" : "text-[var(--text-muted)]"}`}>
-                          {u.warnCount}/3
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {u.bannedAt ? (
-                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-500">⛔ Bloklu</span>
-                        ) : (
-                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/10 text-green-500">✓ Aktiv</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--text-muted)] text-xs whitespace-nowrap">
-                        {new Date(u.createdAt).toLocaleDateString("az-AZ")}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          {u.bannedAt ? (
-                            <ActionBtn onClick={() => userAction(u.id, "unban")} loading={actionLoading === u.id + "unban"} color="green" title="Bloku aç">✓</ActionBtn>
-                          ) : (
-                            <>
-                              <ActionBtn onClick={() => userAction(u.id, "warn")} loading={actionLoading === u.id + "warn"} color="yellow" title="Xəbərdarlıq">⚠</ActionBtn>
-                              <ActionBtn onClick={() => userAction(u.id, "ban")} loading={actionLoading === u.id + "ban"} color="red" title="Blokla">⛔</ActionBtn>
-                            </>
-                          )}
-                          {u.role !== "admin" ? (
-                            <ActionBtn onClick={() => userAction(u.id, "promote")} loading={actionLoading === u.id + "promote"} color="purple" title="Admin et">👑</ActionBtn>
-                          ) : (
-                            <ActionBtn onClick={() => userAction(u.id, "demote")} loading={actionLoading === u.id + "demote"} color="gray" title="Adminlikdən çıxar">↓</ActionBtn>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TabPanel>
-          )}
+        {/* ─── OVERVIEW ─── */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard label="Ümumi İstifadəçi" value={c.totalUsers} icon="👥" color="#0066FF" sub={`+${c.todayUsers || 0} bu gün`} />
+              <StatCard label="Ümumi Elan" value={c.totalJobs} icon="📋" color="#00C853" sub={`${c.activeJobs || 0} aktiv`} />
+              <StatCard label="Müraciətlər" value={c.totalApplications} icon="📨" color="#FF6B00" sub={`${c.pendingApps || 0} gözləyir`} />
+              <StatCard label="Şikayətlər" value={c.flaggedMessages} icon="🚩" color="#E91E63" sub="mesaj" />
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard label="Bu Həftə" value={c.weekUsers} icon="📅" color="#9C27B0" sub="yeni qeydiyyat" />
+              <StatCard label="Bu Ay" value={c.monthUsers} icon="📆" color="#FF9800" sub="yeni qeydiyyat" />
+              <StatCard label="Bloklanmış" value={c.bannedUsers} icon="🚫" color="#F44336" />
+              <StatCard label="VIP İstifadəçi" value={users.filter(u => u.isVip).length} icon="⭐" color="#FFD600" />
+            </div>
 
-          {/* Jobs Tab */}
-          {activeTab === "jobs" && (
-            <TabPanel key="jobs">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[var(--bg-primary)]">
-                    {["#", "Başlıq", "Müəllif", "Büdcə", "Müraciət", "Status", "Tarix"].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left font-semibold text-[var(--text-secondary)]">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border-color)]">
-                  {data.recentJobs.map((j, i) => (
-                    <tr key={j.id} className="hover:bg-[var(--bg-card-hover)] transition-colors">
-                      <td className="px-4 py-3 text-[var(--text-muted)]">{i + 1}</td>
-                      <td className="px-4 py-3 font-medium text-[var(--text-primary)] max-w-[200px] truncate">{j.title}</td>
-                      <td className="px-4 py-3 text-[var(--text-secondary)]">{j.author.name}</td>
-                      <td className="px-4 py-3 font-medium text-[var(--text-secondary)]">{j.budget} ₼</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-500">{j._count.applications} nəfər</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${j.status === "active" ? "bg-green-500/10 text-green-500" : "bg-gray-500/10 text-gray-500"}`}>
-                          {j.status === "active" ? "Aktiv" : "Bağlı"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-[var(--text-muted)] text-xs">{new Date(j.createdAt).toLocaleDateString("az-AZ")}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TabPanel>
-          )}
+            {/* Quick recent users */}
+            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
+              <h3 className="font-bold text-[var(--text-primary)] mb-4">🆕 Son Qeydiyyatlar</h3>
+              <div className="space-y-2">
+                {users.slice(0, 5).map(u => (
+                  <div key={u.id} className="flex items-center justify-between py-2 border-b border-[var(--border-color)] last:border-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-brand-blue/20 flex items-center justify-center text-sm font-bold text-brand-blue">
+                        {u.name?.[0]?.toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-1">
+                          {u.name}
+                          {u.isVip && <span className="text-yellow-400">⭐</span>}
+                          {u.bannedAt && <span className="text-red-400">🚫</span>}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">{u.email}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)]">{timeAgo(u.createdAt)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
-          {/* Applications Tab */}
-          {activeTab === "apps" && (
-            <TabPanel key="apps">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[var(--bg-primary)]">
-                    {["#", "İstifadəçi", "Email", "İş Elanı", "Status", "Tarix"].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left font-semibold text-[var(--text-secondary)]">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border-color)]">
-                  {data.recentApps.map((a, i) => (
-                    <tr key={a.id} className="hover:bg-[var(--bg-card-hover)] transition-colors">
-                      <td className="px-4 py-3 text-[var(--text-muted)]">{i + 1}</td>
-                      <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{a.user.name}</td>
-                      <td className="px-4 py-3 text-[var(--text-secondary)] text-xs">{a.user.email}</td>
-                      <td className="px-4 py-3 text-[var(--text-secondary)] max-w-[200px] truncate">{a.job.title}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          a.status === "pending" ? "bg-yellow-500/10 text-yellow-500" :
-                          a.status === "accepted" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-                        }`}>
-                          {a.status === "pending" ? "Gözləyir" : a.status === "accepted" ? "Qəbul" : "Rədd"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-[var(--text-muted)] text-xs">{new Date(a.createdAt).toLocaleDateString("az-AZ")}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TabPanel>
-          )}
+        {/* ─── USERS ─── */}
+        {activeTab === 'users' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                placeholder="Ad və ya email ilə axtar..."
+                className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-blue"
+              />
+              <span className="text-sm text-[var(--text-muted)]">{filteredUsers.length} nəfər</span>
+            </div>
 
-          {/* Flagged Messages Tab */}
-          {activeTab === "flagged" && (
-            <TabPanel key="flagged">
-              {data.flaggedMessages.length === 0 ? (
-                <div className="p-12 text-center">
-                  <div className="text-4xl mb-3">✅</div>
-                  <p className="text-[var(--text-secondary)] font-medium">Şübhəli mesaj yoxdur</p>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">Bütün mesajlar təmizdir</p>
-                </div>
-              ) : (
+            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden">
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-[var(--bg-primary)]">
-                      {["#", "Göndərən", "Email", "Orijinal Mətn", "Filtrlənib", "Səbəb", "Tarix", "Əməliyyat"].map((h) => (
-                        <th key={h} className="px-4 py-3 text-left font-semibold text-[var(--text-secondary)] whitespace-nowrap">{h}</th>
-                      ))}
+                    <tr className="border-b border-[var(--border-color)] bg-[var(--bg-primary)]">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)]">İstifadəçi</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)]">Peşə</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)]">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)]">Elanlar</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)]">Qeydiyyat</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)]">Əməliyyat</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--border-color)]">
-                    {data.flaggedMessages.map((msg, i) => (
-                      <tr key={msg.id} className="hover:bg-[var(--bg-card-hover)] transition-colors">
-                        <td className="px-4 py-3 text-[var(--text-muted)]">{i + 1}</td>
-                        <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{msg.sender.name}</td>
-                        <td className="px-4 py-3 text-[var(--text-secondary)] text-xs">{msg.sender.email}</td>
-                        <td className="px-4 py-3 text-red-500 text-xs max-w-[150px] truncate">{msg.body}</td>
-                        <td className="px-4 py-3 text-[var(--text-muted)] text-xs max-w-[150px] truncate">{msg.filteredBody ?? "—"}</td>
+                  <tbody>
+                    {filteredUsers.map(u => (
+                      <tr key={u.id} className={`border-b border-[var(--border-color)] hover:bg-[var(--bg-primary)] transition-colors ${u.bannedAt ? 'opacity-50' : ''}`}>
                         <td className="px-4 py-3">
-                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-500">{msg.flagReason}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-brand-blue/20 flex items-center justify-center text-sm font-bold text-brand-blue flex-shrink-0">
+                              {u.name?.[0]?.toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-[var(--text-primary)] flex items-center gap-1">
+                                {u.name}
+                                {u.isVip && <span title="VIP">⭐</span>}
+                                {u.role === 'admin' && <span title="Admin" className="text-xs bg-brand-blue/20 text-brand-blue px-1 rounded">ADMIN</span>}
+                              </p>
+                              <p className="text-xs text-[var(--text-muted)]">{u.email}</p>
+                            </div>
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-[var(--text-muted)] text-xs whitespace-nowrap">
-                          {new Date(msg.createdAt).toLocaleDateString("az-AZ")}
+                        <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
+                          {u.profession || '—'}
+                          {u.city && <p className="text-[var(--text-muted)]">📍 {u.city}</p>}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <ActionBtn onClick={() => userAction(msg.sender.id, "warn")} loading={actionLoading === msg.sender.id + "warn"} color="yellow" title="Xəbərdarlıq">⚠</ActionBtn>
-                            <ActionBtn onClick={() => userAction(msg.sender.id, "ban")} loading={actionLoading === msg.sender.id + "ban"} color="red" title="Blokla">⛔</ActionBtn>
+                          <div className="flex flex-col gap-1">
+                            <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                              u.verificationStatus === 'verified'
+                                ? 'bg-green-500/10 text-green-400'
+                                : 'bg-yellow-500/10 text-yellow-400'
+                            }`}>
+                              {u.verificationStatus === 'verified' ? '✓ Təsdiqlənmiş' : '⏳ Gözləyir'}
+                            </span>
+                            {u.bannedAt && <span className="inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs bg-red-500/10 text-red-400">🚫 Blok</span>}
+                            {u.alovluCount > 0 && <span className="inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs bg-orange-500/10 text-orange-400">🔥 {u.alovluCount}x</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="font-bold text-[var(--text-primary)]">{u._count?.jobs || 0}</span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[var(--text-muted)]">
+                          {new Date(u.createdAt).toLocaleDateString('az-AZ')}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {!u.isVip ? (
+                              <button onClick={() => userAction(u.id, 'makeVip')}
+                                className="rounded-lg bg-yellow-500/10 px-2 py-1 text-xs font-medium text-yellow-400 hover:bg-yellow-500/20 transition-colors">
+                                ⭐ VIP
+                              </button>
+                            ) : (
+                              <button onClick={() => userAction(u.id, 'removeVip')}
+                                className="rounded-lg bg-yellow-500/10 px-2 py-1 text-xs font-medium text-yellow-400 hover:bg-yellow-500/20 transition-colors">
+                                VIP Çıxar
+                              </button>
+                            )}
+                            {u.verificationStatus !== 'verified' && (
+                              <button onClick={() => userAction(u.id, 'verify')}
+                                className="rounded-lg bg-green-500/10 px-2 py-1 text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors">
+                                ✓ Təsdiqlə
+                              </button>
+                            )}
+                            {!u.bannedAt ? (
+                              <button onClick={() => userAction(u.id, 'ban')}
+                                className="rounded-lg bg-red-500/10 px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors">
+                                🚫 Blok
+                              </button>
+                            ) : (
+                              <button onClick={() => userAction(u.id, 'unban')}
+                                className="rounded-lg bg-green-500/10 px-2 py-1 text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors">
+                                Bloku Qaldır
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              )}
-            </TabPanel>
-          )}
-        </AnimatePresence>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── LISTINGS ─── */}
+        {activeTab === 'listings' && (
+          <div className="space-y-3">
+            {jobs.map(job => (
+              <div key={job.id} className={`rounded-2xl border p-4 ${
+                job.isAlovlu ? 'border-orange-500/50 bg-orange-500/5' : 'border-[var(--border-color)] bg-[var(--bg-card)]'
+              }`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      {job.isAlovlu && <span className="text-xs font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">🔥 ALOVLU</span>}
+                      <span className="text-xs font-medium text-brand-blue bg-brand-blue/10 px-2 py-0.5 rounded-full">{job.section?.toUpperCase()}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        job.paymentStatus === 'paid' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'
+                      }`}>{job.paymentStatus === 'paid' ? '✓ Ödənilmiş' : '⏳ Ödəniş gözlənilir'}</span>
+                    </div>
+                    <p className="font-semibold text-[var(--text-primary)]">{job.title}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                      {job.author?.name} · {job.budget} ₼ · {job._count?.applications || 0} müraciət
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {job.paymentStatus !== 'paid' && (
+                      <button onClick={() => jobAction(job.id, 'approve')}
+                        className="rounded-lg bg-green-500/10 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors">
+                        ✓ Təsdiqlə
+                      </button>
+                    )}
+                    {!job.isAlovlu && (
+                      <button onClick={() => jobAction(job.id, 'makeAlovlu')}
+                        className="rounded-lg bg-orange-500/10 px-3 py-1.5 text-xs font-medium text-orange-400 hover:bg-orange-500/20 transition-colors">
+                        🔥 Alovlu et
+                      </button>
+                    )}
+                    <button onClick={() => jobAction(job.id, 'reject')}
+                      className="rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors">
+                      Rədd et
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {jobs.length === 0 && <p className="text-center py-12 text-[var(--text-muted)]">Elan yoxdur</p>}
+          </div>
+        )}
+
+        {/* ─── ALOVLU ─── */}
+        {activeTab === 'alovlu' && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-orange-500/30 bg-orange-500/5 p-5">
+              <h3 className="font-bold text-orange-400 mb-4">🔥 Alovlu Elan İdarəetməsi</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                <StatCard label="Aktiv Alovlu" value={jobs.filter(j => j.isAlovlu).length} icon="🔥" color="#FF6B00" />
+                <StatCard label="VIP Üzvlər" value={users.filter(u => u.isVip).length} icon="⭐" color="#FFD600" />
+                <StatCard label="VIP Astanası" value="5 alovlu" icon="🎯" color="#9C27B0" />
+              </div>
+              <div className="text-xs text-[var(--text-muted)] space-y-1 bg-[var(--bg-primary)] rounded-xl p-3">
+                <p>• İstifadəçi 5 alovlu elan etdikdə avtomatik VIP statusu alır</p>
+                <p>• Alovlu elan normal qiymətin 3 qatıdır</p>
+                <p>• Admin alovlu elanlara əl ilə təsir edə bilər</p>
+              </div>
+            </div>
+            {jobs.filter(j => j.isAlovlu).map(job => (
+              <div key={job.id} className="rounded-2xl border border-orange-500/40 bg-orange-500/5 p-4">
+                <p className="font-semibold text-[var(--text-primary)]">{job.title}</p>
+                <p className="text-xs text-orange-400 mt-1">{job.author?.name} · {job.budget} ₼</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ─── FLAGGED ─── */}
+        {activeTab === 'flagged' && (
+          <div className="space-y-3">
+            {flagged.length === 0 && (
+              <div className="text-center py-16 text-[var(--text-muted)]">
+                <div className="text-4xl mb-3">✅</div>
+                <p>Şikayət edilmiş mesaj yoxdur</p>
+              </div>
+            )}
+            {flagged.map(msg => (
+              <div key={msg.id} className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-red-400">{msg.sender?.name} — {msg.sender?.email}</p>
+                    <p className="text-sm text-[var(--text-secondary)] mt-1 bg-[var(--bg-card)] rounded-lg px-3 py-2">
+                      "{msg.body}"
+                    </p>
+                    {msg.flagReason && <p className="text-xs text-red-400 mt-1">Səbəb: {msg.flagReason}</p>}
+                    <p className="text-xs text-[var(--text-muted)] mt-1">{timeAgo(msg.createdAt)}</p>
+                  </div>
+                  <div className="ml-4 flex flex-col gap-2">
+                    <button onClick={() => resolveFlag(msg.id)}
+                      className="rounded-lg bg-green-500/10 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20">
+                      ✓ Həll et
+                    </button>
+                    <button onClick={() => userAction(msg.sender?.id, 'ban')}
+                      className="rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20">
+                      🚫 Blokla
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </section>
-  );
-}
-
-/* ─── Sub-components ─── */
-function StatCard({ icon, label, value, sub, color }: { icon: string; label: string; value: number | string; sub?: string; color: string }) {
-  const styles: Record<string, string> = {
-    blue: "from-blue-500/10 to-blue-600/5 border-blue-500/20 text-blue-500",
-    green: "from-green-500/10 to-green-600/5 border-green-500/20 text-green-500",
-    purple: "from-purple-500/10 to-purple-600/5 border-purple-500/20 text-purple-500",
-    red: "from-red-500/10 to-red-600/5 border-red-500/20 text-red-500",
-    orange: "from-orange-500/10 to-orange-600/5 border-orange-500/20 text-orange-500",
-    gold: "from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 text-yellow-500",
-  };
-  const [bg, text] = styles[color]?.split(" text-") ?? ["", ""];
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl border bg-gradient-to-br p-4 ${bg} border-${color === "blue" ? "blue" : color}-500/20`}>
-      <span className="text-xl">{icon}</span>
-      <div className={`text-2xl font-black mt-2 text-${color}-500`}>{value}</div>
-      <div className="text-xs font-medium text-[var(--text-secondary)] mt-1">{label}</div>
-      {sub && <div className="text-xs text-[var(--text-muted)] mt-0.5">{sub}</div>}
-    </motion.div>
-  );
-}
-
-function RegCard({ period, count, icon, gradient, border, textColor }: { period: string; count: number; icon: string; gradient: string; border: string; textColor: string }) {
-  return (
-    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-      className={`rounded-xl border bg-gradient-to-br p-5 text-center ${gradient} ${border}`}>
-      <span className="text-2xl">{icon}</span>
-      <div className={`text-4xl font-black mt-2 ${textColor}`}>{count}</div>
-      <div className="text-sm font-medium text-[var(--text-secondary)] mt-1">{period}</div>
-      <div className="text-xs text-[var(--text-muted)] mt-0.5">yeni qeydiyyat</div>
-    </motion.div>
-  );
-}
-
-function TabPanel({ children }: { children: React.ReactNode }) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-      className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden">
-      <div className="overflow-x-auto">{children}</div>
-    </motion.div>
-  );
-}
-
-function ActionBtn({ onClick, loading, color, title, children }: {
-  onClick: () => void; loading: boolean; color: string; title: string; children: React.ReactNode;
-}) {
-  const colors: Record<string, string> = {
-    red: "bg-red-500/10 text-red-500 hover:bg-red-500/20",
-    yellow: "bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20",
-    green: "bg-green-500/10 text-green-500 hover:bg-green-500/20",
-    purple: "bg-purple-500/10 text-purple-500 hover:bg-purple-500/20",
-    gray: "bg-gray-500/10 text-gray-500 hover:bg-gray-500/20",
-  };
-  return (
-    <button onClick={onClick} disabled={loading} title={title}
-      className={`w-7 h-7 rounded-lg text-xs flex items-center justify-center transition-all disabled:opacity-40 ${colors[color]}`}>
-      {loading ? <span className="animate-spin">◌</span> : children}
-    </button>
+    </div>
   );
 }

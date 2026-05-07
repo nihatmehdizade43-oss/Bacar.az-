@@ -1,90 +1,94 @@
-// Purpose: Jobs list/create/update/delete collection endpoint.
-import { prisma } from "@/lib/prisma";
-import { fail, handleApiError, ok } from "@/lib/api";
-import { getAuthSession } from "@/lib/auth";
-import { jobSchema } from "@/lib/validations";
+// Purpose: Jobs API — support isAlovlu filter and section filter.
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { getAuthSession } from '@/lib/auth';
+import { jobSchema } from '@/lib/validations';
 
-export async function GET() {
+export async function GET(req) {
   try {
-    const jobs = await prisma.job.findMany({
-      include: {
-        author: {
-          select: { id: true, name: true, city: true },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const { searchParams } = new URL(req.url);
+    const isAlovlu = searchParams.get('isAlovlu') === 'true';
+    const section = searchParams.get('section') || '';
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const page = parseInt(searchParams.get('page') || '1');
+    const search = searchParams.get('search') || '';
 
-    return ok(jobs);
+    const where = {
+      status: 'active',
+      ...(isAlovlu && { isAlovlu: true }),
+      ...(section && { section }),
+      ...(search && {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ]
+      }),
+    };
+
+    const [data, total] = await Promise.all([
+      prisma.job.findMany({
+        where,
+        take: limit,
+        skip: (page - 1) * limit,
+        orderBy: [{ isAlovlu: 'desc' }, { createdAt: 'desc' }],
+        include: {
+          author: { select: { id: true, name: true, city: true, isVip: true, image: true } },
+          _count: { select: { applications: true } },
+        },
+      }),
+      prisma.job.count({ where }),
+    ]);
+
+    return NextResponse.json({ success: true, data, total });
   } catch (error) {
-    return handleApiError(error);
+    console.error('Jobs GET error:', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(req) {
   try {
     const session = await getAuthSession();
-    if (!session?.user) return fail("Unauthorized", 401);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    const payload = await request.json();
-    const parsed = jobSchema.safeParse(payload);
-    if (!parsed.success) return fail("Validation error", 422, parsed.error.flatten());
+    const body = await req.json();
+    const validated = jobSchema.parse(body);
+    const { section, plan, isAlovlu, contractSigned, contractSignedAt } = body;
 
     const job = await prisma.job.create({
       data: {
-        ...parsed.data,
+        ...validated,
         authorId: session.user.id,
+        section: section || 'bacar',
+        plan: plan || null,
+        isAlovlu: isAlovlu || false,
+        contractSigned: contractSigned || false,
+        contractSignedAt: contractSignedAt ? new Date(contractSignedAt) : null,
+        paymentStatus: plan ? 'pending' : 'free',
+        publishedUntil: plan ? null : null,
       },
     });
 
-    return ok(job, { status: 201 });
+    // If alovlu, increment user's alovlu count and check VIP
+    if (isAlovlu) {
+      const user = await prisma.user.update({
+        where: { id: session.user.id },
+        data: { alovluCount: { increment: 1 } },
+      });
+      // Auto-grant VIP at threshold
+      if (user.alovluCount >= 5 && !user.isVip) {
+        await prisma.user.update({
+          where: { id: session.user.id },
+          data: { isVip: true },
+        });
+      }
+    }
+
+    return NextResponse.json({ success: true, data: job }, { status: 201 });
   } catch (error) {
-    return handleApiError(error);
-  }
-}
-
-export async function PUT(request: Request) {
-  try {
-    const session = await getAuthSession();
-    if (!session?.user) return fail("Unauthorized", 401);
-
-    const payload = (await request.json()) as { id?: string } & Record<string, unknown>;
-    if (!payload.id) return fail("Job id is required", 400);
-
-    const existing = await prisma.job.findUnique({ where: { id: payload.id } });
-    if (!existing) return fail("Job not found", 404);
-    if (existing.authorId !== session.user.id && session.user.role !== "admin") return fail("Forbidden", 403);
-
-    const parsed = jobSchema.partial().safeParse(payload);
-    if (!parsed.success) return fail("Validation error", 422, parsed.error.flatten());
-
-    const updated = await prisma.job.update({
-      where: { id: payload.id },
-      data: parsed.data,
-    });
-
-    return ok(updated);
-  } catch (error) {
-    return handleApiError(error);
-  }
-}
-
-export async function DELETE(request: Request) {
-  try {
-    const session = await getAuthSession();
-    if (!session?.user) return fail("Unauthorized", 401);
-
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    if (!id) return fail("Job id is required", 400);
-
-    const existing = await prisma.job.findUnique({ where: { id } });
-    if (!existing) return fail("Job not found", 404);
-    if (existing.authorId !== session.user.id && session.user.role !== "admin") return fail("Forbidden", 403);
-
-    await prisma.job.delete({ where: { id } });
-    return ok({ deleted: true });
-  } catch (error) {
-    return handleApiError(error);
+    console.error('Jobs POST error:', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

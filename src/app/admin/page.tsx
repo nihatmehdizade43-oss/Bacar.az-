@@ -410,8 +410,9 @@ export default function AdminPage() {
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-red-400">{msg.sender?.name} — {msg.sender?.email}</p>
                     <p className="text-sm text-[var(--text-secondary)] mt-1 bg-[var(--bg-card)] rounded-lg px-3 py-2">
-                      "{msg.body}"
+                      {'"'}{msg.body}{'"'}
                     </p>
+
                     {msg.flagReason && <p className="text-xs text-red-400 mt-1">Səbəb: {msg.flagReason}</p>}
                     <p className="text-xs text-[var(--text-muted)] mt-1">{timeAgo(msg.createdAt)}</p>
                   </div>

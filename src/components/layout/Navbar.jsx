@@ -1,7 +1,7 @@
-/* ============================================
-   Bacar.az — Navbar with Notification Bell
-   ============================================ */
 'use client';
+/* ============================================
+   Bacar.az — Navbar with Notification Bell (JSX)
+   ============================================ */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
@@ -22,7 +22,6 @@ const navLinks = [
 
 const isActive = (pathname, href) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
 
-
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -31,7 +30,6 @@ export default function Navbar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const bellRef = useRef(null);
-
 
   useEffect(() => setMobileOpen(false), [pathname]);
 
@@ -53,10 +51,9 @@ export default function Navbar() {
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
-  // Close notif panel on outside click
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+    function handleClick(e) {
+      if (bellRef.current && !bellRef.current.contains(e.target)) {
         setNotifOpen(false);
       }
     }
@@ -64,7 +61,7 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  async function markRead(id: string) {
+  async function markRead(id) {
     await fetch(`/api/notifications/${id}`, { method: 'PATCH' });
     fetchNotifications();
   }
@@ -162,7 +159,6 @@ export default function Navbar() {
                 </AnimatePresence>
               </div>
 
-              {/* Mesajlar */}
               <Link href="/mesajlar"
                 className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
                   isActive(pathname, '/mesajlar') ? 'text-white' : 'text-slate-300 hover:text-[#0066FF]'

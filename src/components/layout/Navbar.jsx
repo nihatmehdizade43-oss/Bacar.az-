@@ -30,7 +30,8 @@ export default function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
   const { data: session } = useSession();
-  const bellRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef(null);
+
 
   useEffect(() => setMobileOpen(false), [pathname]);
 

@@ -13,6 +13,7 @@ const footerLinks = {
     { label: 'Vizit — AI Portfolio', href: '/vizit' },
     { label: 'İşlər — Freelance', href: '/isler' },
     { label: 'Dashboard', href: '/dashboard' },
+    { label: 'Mesajlarım', href: '/mesajlar' },
   ],
   'Tezliklə': [
     { label: 'Ortaq — Networking', href: '/ortaq' },
@@ -21,12 +22,13 @@ const footerLinks = {
     { label: 'Yarış — Challenge', href: '#' },
   ],
   'Dəstək': [
-    { label: 'Haqqımızda', href: '#' },
-    { label: 'Mesajlarım', href: '/mesajlar' },
-    { label: 'Gizlilik Siyasəti', href: '/gizlilik' },
-    { label: 'İstifadə Şərtləri', href: '/gizlilik' },
+    { label: '📧 nihatmehdizade43@gmail.com', href: 'mailto:nihatmehdizade43@gmail.com' },
+    { label: '📞 +994 55 322 91 66', href: 'tel:+994553229166' },
+    { label: '💬 WhatsApp Dəstək', href: 'https://wa.me/994553229166' },
+    { label: '🔒 Gizlilik Siyasəti', href: '/gizlilik' },
   ],
 };
+
 
 export default function Footer() {
   const router = useRouter();

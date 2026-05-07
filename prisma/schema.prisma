@@ -1,37 +1,42 @@
-/// Purpose: Prisma schema for production-ready Bacar.az MVP.
+/// Purpose: Prisma schema — PostgreSQL for Vercel/Neon production.
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id                String         @id @default(uuid())
-  email             String         @unique
-  passwordHash      String?
-  name              String
-  role              String         @default("user")
-  city              String?
-  bio               String?
-  skills            Json?
-  image             String?
-  mentor            Boolean        @default(false)
-  bannedAt          DateTime?
-  warnCount         Int            @default(0)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  jobs              Job[]
-  applications      Application[]
-  accounts          Account[]
-  sessions          Session[]
-  sentMessages      Message[]      @relation("SentMessages")
-  conversationsAsA  Conversation[] @relation("ParticipantA")
-  conversationsAsB  Conversation[] @relation("ParticipantB")
-  contractsAsClient Contract[]     @relation("ClientContracts")
-  contractsAsFreelancer Contract[] @relation("FreelancerContracts")
+  id                    String         @id @default(uuid())
+  email                 String         @unique
+  passwordHash          String?
+  name                  String
+  role                  String         @default("user")
+  city                  String?
+  bio                   String?
+  skills                Json?
+  image                 String?
+  mentor                Boolean        @default(false)
+  profession            String?
+  activityAreas         Json?
+  verificationStatus    String         @default("unverified")
+  bannedAt              DateTime?
+  warnCount             Int            @default(0)
+  privacyAccepted       Boolean        @default(false)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  jobs                  Job[]
+  applications          Application[]
+  accounts              Account[]
+  sessions              Session[]
+  sentMessages          Message[]      @relation("SentMessages")
+  conversationsAsA      Conversation[] @relation("ParticipantA")
+  conversationsAsB      Conversation[] @relation("ParticipantB")
+  contractsAsClient     Contract[]     @relation("ClientContracts")
+  contractsAsFreelancer Contract[]     @relation("FreelancerContracts")
+  notifications         Notification[]
 }
 
 model Job {
@@ -51,14 +56,14 @@ model Job {
 
 model Application {
   id        String   @id @default(uuid())
-  jobId      String
-  userId     String
-  message    String
-  status     String   @default("pending")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId     String
+  userId    String
+  message   String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([jobId, userId])
 }
@@ -76,8 +81,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -96,6 +100,18 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  type      String   @default("info")
+  readAt    DateTime?
+  link      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Conversation {

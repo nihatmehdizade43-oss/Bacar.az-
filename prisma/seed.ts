@@ -1,10 +1,14 @@
-// Purpose: Seed database with demo users, jobs, mentors and startup ideas.
+// Purpose: Seed database with demo users, jobs, mentors and welcome notifications.
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.notification.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.conversation.deleteMany();
+  await prisma.contract.deleteMany();
   await prisma.application.deleteMany();
   await prisma.job.deleteMany();
   await prisma.account.deleteMany();
@@ -22,6 +26,10 @@ async function main() {
         city: "Baku",
         bio: "Platform administrator.",
         skills: ["management", "ops"],
+        profession: "Full-Stack Developer",
+        activityAreas: ["Proqramlaşdırma", "Startup"],
+        privacyAccepted: true,
+        verificationStatus: "verified",
         passwordHash,
       },
     }),
@@ -34,6 +42,10 @@ async function main() {
         bio: "Frontend developer.",
         mentor: true,
         skills: ["react", "nextjs", "tailwind"],
+        profession: "Frontend Developer",
+        activityAreas: ["Proqramlaşdırma", "Mentorluq"],
+        privacyAccepted: true,
+        verificationStatus: "verified",
         passwordHash,
       },
     }),
@@ -46,6 +58,10 @@ async function main() {
         bio: "UI/UX designer.",
         mentor: true,
         skills: ["figma", "ui", "branding"],
+        profession: "UI/UX Dizayneri",
+        activityAreas: ["Dizayn"],
+        privacyAccepted: true,
+        verificationStatus: "verified",
         passwordHash,
       },
     }),
@@ -57,6 +73,10 @@ async function main() {
         city: "Ganja",
         bio: "Mobile engineer.",
         skills: ["react native", "flutter"],
+        profession: "Mobil Tətbiq Tərtibatçısı",
+        activityAreas: ["Mobil", "Proqramlaşdırma"],
+        privacyAccepted: true,
+        verificationStatus: "unverified",
         passwordHash,
       },
     }),
@@ -69,6 +89,10 @@ async function main() {
         bio: "Startup founder.",
         mentor: true,
         skills: ["startup", "pitch", "growth"],
+        profession: "Startup Qurucu",
+        activityAreas: ["Startup", "Marketinq", "Mentorluq"],
+        privacyAccepted: true,
+        verificationStatus: "verified",
         passwordHash,
       },
     }),
@@ -77,15 +101,15 @@ async function main() {
   const normalUsers = users.filter((u) => u.role === "user");
 
   const jobs: [string, string, number, number][] = [
-      ["Landing redesign", "UI/UX", 900, 14],
-      ["Next.js blog platform", "Development", 1400, 20],
-      ["Social media campaign", "Marketing", 700, 10],
-      ["Logo + brand package", "Design", 600, 7],
-      ["MVP API integration", "Development", 1800, 21],
-      ["Short-form video editing", "Video", 450, 5],
-      ["Product copywriting", "Content", 500, 6],
-      ["Startup pitch deck", "Startup", 1200, 12],
-    ];
+    ["Landing redesign", "UI/UX", 900, 14],
+    ["Next.js blog platform", "Development", 1400, 20],
+    ["Social media campaign", "Marketing", 700, 10],
+    ["Logo + brand package", "Design", 600, 7],
+    ["MVP API integration", "Development", 1800, 21],
+    ["Short-form video editing", "Video", 450, 5],
+    ["Product copywriting", "Content", 500, 6],
+    ["Startup pitch deck", "Startup", 1200, 12],
+  ];
 
   await Promise.all(
     jobs.map((item, index) =>
@@ -102,12 +126,27 @@ async function main() {
       }),
     ),
   );
+
+  // Welcome notifications for all users
+  await Promise.all(
+    users.map((u) =>
+      prisma.notification.create({
+        data: {
+          userId: u.id,
+          title: "🎉 Bacar.az-a xoş gəldiniz!",
+          body: `Salam ${u.name}! Hesabınız uğurla yaradıldı. Elanlar tapmaq, freelancerlərlə əlaqə qurmaq və AI portfolio yaratmaq üçün platformadan istifadə edə bilərsiniz.`,
+          type: "welcome",
+          link: "/dashboard",
+        },
+      }),
+    ),
+  );
+
+  console.log(`✅ Seed tamamlandı: ${users.length} user, ${jobs.length} iş, ${users.length} bildiriş`);
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
+  .then(async () => { await prisma.$disconnect(); })
   .catch(async (error) => {
     console.error(error);
     await prisma.$disconnect();

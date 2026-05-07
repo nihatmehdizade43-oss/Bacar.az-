@@ -9,7 +9,10 @@ export const metadata: Metadata = {
 
 const LAST_UPDATED = "07 May 2026";
 const COMPANY = "Bacar.az";
-const EMAIL = "legal@bacar.az";
+const EMAIL = "nihatmehdizade43@gmail.com";
+const PHONE = "+994 55 322 91 66";
+const WHATSAPP = "https://wa.me/994553229166";
+
 
 export default function PrivacyPage() {
   return (
@@ -160,9 +163,11 @@ export default function PrivacyPage() {
 
           <Section num="10" title="Əlaqə">
             <p>Gizlilik məsələləri ilə bağlı suallarınız üçün:</p>
-            <div className="mt-3 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] space-y-1 text-sm">
+            <div className="mt-3 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] space-y-2 text-sm">
               <p><strong className="text-[var(--text-primary)]">Şirkət:</strong> {COMPANY}</p>
               <p><strong className="text-[var(--text-primary)]">Email:</strong> <a href={`mailto:${EMAIL}`} className="text-brand-blue hover:underline">{EMAIL}</a></p>
+              <p><strong className="text-[var(--text-primary)]">Telefon:</strong> <a href={`tel:${PHONE.replace(/\s/g,'')}`} className="text-brand-blue hover:underline">{PHONE}</a></p>
+              <p><strong className="text-[var(--text-primary)]">WhatsApp:</strong> <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline">Yazın 💬</a></p>
               <p><strong className="text-[var(--text-primary)]">Platforma:</strong> <Link href="/" className="text-brand-blue hover:underline">bacar.az</Link></p>
             </div>
           </Section>

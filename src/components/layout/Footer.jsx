@@ -22,9 +22,9 @@ const footerLinks = {
   ],
   'Dəstək': [
     { label: 'Haqqımızda', href: '#' },
-    { label: 'Əlaqə', href: '#' },
-    { label: 'Gizlilik Siyasəti', href: '#' },
-    { label: 'İstifadə Şərtləri', href: '#' },
+    { label: 'Mesajlarım', href: '/mesajlar' },
+    { label: 'Gizlilik Siyasəti', href: '/gizlilik' },
+    { label: 'İstifadə Şərtləri', href: '/gizlilik' },
   ],
 };
 

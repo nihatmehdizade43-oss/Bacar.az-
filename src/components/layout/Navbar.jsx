@@ -60,6 +60,11 @@ export default function Navbar() {
           <ThemeToggle />
           {session?.user ? (
             <>
+              <Link href="/mesajlar" className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                isActive(pathname, '/mesajlar') ? 'text-white' : 'text-slate-300 hover:text-brand-blue'
+              }`}>
+                💬 Mesajlar
+              </Link>
               <Link href="/dashboard">
                 <Button variant="ghost" size="sm">Panel</Button>
               </Link>
@@ -110,6 +115,13 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+            {session?.user && (
+              <Link href="/mesajlar" className={`block rounded-lg px-3 py-2 text-sm ${
+                isActive(pathname, '/mesajlar') ? 'font-bold text-white' : 'font-medium text-slate-300 hover:text-[#0066FF]'
+              }`}>
+                💬 Mesajlar
+              </Link>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

@@ -9,22 +9,29 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  passwordHash String?
-  name         String
-  role         String        @default("user")
-  city         String?
-  bio          String?
-  skills       Json?
-  image        String?
-  mentor       Boolean       @default(false)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  jobs         Job[]
-  applications Application[]
-  accounts     Account[]
-  sessions     Session[]
+  id                String         @id @default(uuid())
+  email             String         @unique
+  passwordHash      String?
+  name              String
+  role              String         @default("user")
+  city              String?
+  bio               String?
+  skills            Json?
+  image             String?
+  mentor            Boolean        @default(false)
+  bannedAt          DateTime?
+  warnCount         Int            @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  jobs              Job[]
+  applications      Application[]
+  accounts          Account[]
+  sessions          Session[]
+  sentMessages      Message[]      @relation("SentMessages")
+  conversationsAsA  Conversation[] @relation("ParticipantA")
+  conversationsAsB  Conversation[] @relation("ParticipantB")
+  contractsAsClient Contract[]     @relation("ClientContracts")
+  contractsAsFreelancer Contract[] @relation("FreelancerContracts")
 }
 
 model Job {
@@ -89,4 +96,49 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Conversation {
+  id             String    @id @default(uuid())
+  participantAId String
+  participantBId String
+  jobId          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  participantA   User      @relation("ParticipantA", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantB   User      @relation("ParticipantB", fields: [participantBId], references: [id], onDelete: Cascade)
+  messages       Message[]
+
+  @@unique([participantAId, participantBId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  senderId       String
+  body           String
+  filteredBody   String?
+  flagged        Boolean      @default(false)
+  flagReason     String?
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model Contract {
+  id           String    @id @default(uuid())
+  jobId        String?
+  clientId     String
+  freelancerId String
+  title        String
+  amount       Int
+  commission   Int       @default(0)
+  status       String    @default("pending")
+  escrowLocked Boolean   @default(false)
+  paidAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  client       User      @relation("ClientContracts", fields: [clientId], references: [id], onDelete: Cascade)
+  freelancer   User      @relation("FreelancerContracts", fields: [freelancerId], references: [id], onDelete: Cascade)
 }

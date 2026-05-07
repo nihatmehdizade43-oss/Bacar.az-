@@ -1,4 +1,4 @@
-// Purpose: Admin stats API — registration counts by time period.
+// Purpose: Admin stats API — registration counts, flagged messages, banned users.
 import { NextResponse } from "next/server";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -20,17 +20,10 @@ export async function GET() {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [
-      totalUsers,
-      totalJobs,
-      totalApplications,
-      todayUsers,
-      weekUsers,
-      monthUsers,
-      activeJobs,
-      pendingApps,
-      recentUsers,
-      recentJobs,
-      recentApps,
+      totalUsers, totalJobs, totalApplications,
+      todayUsers, weekUsers, monthUsers,
+      activeJobs, pendingApps, bannedUsers, flaggedMessages,
+      recentUsers, recentJobs, recentApps, flaggedMsgs,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.job.count(),
@@ -40,33 +33,26 @@ export async function GET() {
       prisma.user.count({ where: { createdAt: { gte: monthStart } } }),
       prisma.job.count({ where: { status: "active" } }),
       prisma.application.count({ where: { status: "pending" } }),
+      prisma.user.count({ where: { bannedAt: { not: null } } }),
+      prisma.message.count({ where: { flagged: true } }),
       prisma.user.findMany({
         orderBy: { createdAt: "desc" },
-        take: 15,
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          city: true,
-          createdAt: true,
-        },
+        take: 20,
+        select: { id: true, name: true, email: true, role: true, city: true, bannedAt: true, warnCount: true, createdAt: true },
       }),
       prisma.job.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 10,
-        include: {
-          author: { select: { name: true, email: true } },
-          _count: { select: { applications: true } },
-        },
+        orderBy: { createdAt: "desc" }, take: 10,
+        include: { author: { select: { name: true, email: true } }, _count: { select: { applications: true } } },
       }),
       prisma.application.findMany({
+        orderBy: { createdAt: "desc" }, take: 10,
+        include: { user: { select: { name: true, email: true } }, job: { select: { title: true } } },
+      }),
+      prisma.message.findMany({
+        where: { flagged: true },
         orderBy: { createdAt: "desc" },
-        take: 10,
-        include: {
-          user: { select: { name: true, email: true } },
-          job: { select: { title: true } },
-        },
+        take: 30,
+        include: { sender: { select: { id: true, name: true, email: true } } },
       }),
     ]);
 
@@ -74,18 +60,14 @@ export async function GET() {
       success: true,
       data: {
         counts: {
-          totalUsers,
-          totalJobs,
-          totalApplications,
-          todayUsers,
-          weekUsers,
-          monthUsers,
-          activeJobs,
-          pendingApps,
+          totalUsers, totalJobs, totalApplications,
+          todayUsers, weekUsers, monthUsers,
+          activeJobs, pendingApps, bannedUsers, flaggedMessages,
         },
         recentUsers,
         recentJobs,
         recentApps,
+        flaggedMessages: flaggedMsgs,
       },
     });
   } catch (error) {

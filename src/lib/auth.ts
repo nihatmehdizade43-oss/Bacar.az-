@@ -1,4 +1,4 @@
-// Purpose: NextAuth configuration with Credentials + Google providers.
+// Purpose: NextAuth configuration — blocks banned users, Google + Credentials.
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import type { NextAuthOptions } from "next-auth";
@@ -10,12 +10,8 @@ import { loginSchema } from "@/lib/validations";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
-  // Use JWT sessions so middleware can reliably gate routes via getToken().
   session: { strategy: "jwt" },
-  pages: {
-    signIn: "/login",
-    error: "/login",
-  },
+  pages: { signIn: "/login", error: "/login" },
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -33,23 +29,19 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!user?.passwordHash) return null;
+          // Block banned users
+          if (user.bannedAt) return null;
+
           const isValid = await bcrypt.compare(parsed.data.password, user.passwordHash);
           if (!isValid) return null;
 
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            image: user.image,
-            role: user.role,
-          };
+          return { id: user.id, email: user.email, name: user.name, image: user.image, role: user.role };
         } catch (error) {
           console.error("Authorize error:", error);
           return null;
         }
       },
     }),
-    // Only register Google provider when credentials are actually set
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
       ? [
           GoogleProvider({
@@ -62,25 +54,20 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account }) {
-      // For OAuth (Google), ensure user record exists with a role
       if (account?.provider === "google" && user?.email) {
         try {
           const existing = await prisma.user.findUnique({
             where: { email: user.email.toLowerCase() },
           });
+          // Block banned Google users
+          if (existing?.bannedAt) return false;
           if (!existing) {
-            // Auto-create user for Google sign-in
             await prisma.user.create({
-              data: {
-                email: user.email.toLowerCase(),
-                name: user.name ?? "İstifadəçi",
-                role: "user",
-              },
+              data: { email: user.email.toLowerCase(), name: user.name ?? "İstifadəçi", role: "user" },
             });
           }
         } catch (error) {
           console.error("Google signIn callback error:", error);
-          // Don't block sign-in if user already exists via adapter
         }
       }
       return true;
@@ -88,14 +75,15 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.role = (user as { role?: string }).role ?? "user";
+        token.id = user.id;
       }
-      // Ensure role is available after OAuth logins where `user` isn't present on every request.
       if (!token.role && token.sub) {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.sub },
-            select: { role: true },
+            select: { role: true, bannedAt: true },
           });
+          if (dbUser?.bannedAt) return { ...token, error: "banned" };
           token.role = dbUser?.role ?? "user";
         } catch {
           token.role = "user";

@@ -167,7 +167,7 @@ export default function Navbar() {
               </Link>
 
               <Link href="/dashboard">
-                <Button variant="ghost" size="sm">Panel</Button>
+                <Button variant="ghost" size="sm">Profil</Button>
               </Link>
               <button onClick={() => signOut({ callbackUrl: '/' })}
                 className="text-sm text-slate-300 transition-colors hover:text-red-400">
@@ -217,7 +217,7 @@ export default function Navbar() {
                   isActive(pathname, '/mesajlar') ? 'font-bold text-white' : 'font-medium text-slate-300 hover:text-[#0066FF]'
                 }`}>💬 Mesajlar</Link>
                 <Link href="/dashboard" className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-[#0066FF]">
-                  📊 Panel
+                  👤 Profil
                 </Link>
                 <button onClick={() => signOut({ callbackUrl: '/' })}
                   className="block w-full text-left rounded-lg px-3 py-2 text-sm font-medium text-red-400 hover:text-red-300">

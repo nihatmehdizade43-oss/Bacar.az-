@@ -16,7 +16,7 @@ export async function GET(req) {
     const section = searchParams.get('section') || '';
     const isAlovlu = searchParams.get('isAlovlu') === 'true';
 
-    const where = {
+    const where: any = {
       ...(section && { section }),
       ...(isAlovlu && { isAlovlu: true }),
     };

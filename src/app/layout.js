@@ -9,7 +9,6 @@ import { AuthProvider } from '@/context/AuthContext';
 import { ToastProvider } from '@/components/ui/Toast';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-import AiChat from '@/components/ui/AiChat';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -49,7 +48,6 @@ export default function RootLayout({ children }) {
                     {children}
                   </main>
                   <Footer />
-                  <AiChat />
                 </div>
               </ToastProvider>
             </AuthProvider>

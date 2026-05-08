@@ -28,7 +28,9 @@ export function formatDate(date) {
  * @param {number} max
  */
 export function formatBudget(min, max) {
-  return `${min} - ${max} AZN`;
+  if (!min && !max) return 'Razılaşmaya görə';
+  if (!max || min === max) return `${min} ₼`;
+  return `${min} – ${max} ₼`;
 }
 
 /**

@@ -9,12 +9,13 @@ import { motion } from 'framer-motion';
 /* ─── Helpers ─── */
 function fmt(n) { return n?.toLocaleString('az-AZ') ?? '0'; }
 function timeAgo(d) {
-  const diff = (Date.now() - new Date(d)) / 1000;
+  const diff = (Date.now() - new Date(d).getTime()) / 1000;
   if (diff < 60) return `${Math.floor(diff)}s əvvəl`;
   if (diff < 3600) return `${Math.floor(diff / 60)}d əvvəl`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}s əvvəl`;
   return new Date(d).toLocaleDateString('az-AZ');
 }
+
 
 /* ─── Stat Card ─── */
 function StatCard({ label, value, icon, color = '#0066FF', sub }) {
